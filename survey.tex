@@ -1,0 +1,64 @@
+\documentclass{article}
+
+\title{A Survey of Parallel Programming Concepts}
+\author{Kyle Clapper}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+Brief explaination of what parallel programming is and motivate
+why we need it.
+
+\section{Parallel Programming Concepts}
+This section will discuss the various parallel programming
+concepts and paradigms.
+
+\subsection{Concurrency vs Parallelism}
+Short explaination of the difference.
+
+\subsection{Shared State vs Message Passing}
+Some languages rely on shared state need mechanisms like
+locks and semaphores to manage it.
+
+Other languages use no shared state and rely on message passing to
+share data between parallel tasks.
+
+\subsection{Task Parallelism vs Data Parallelism}
+This is basically the difference between GPU parallelism
+and CPU parallelism. SIMD vs running different tasks on
+different CPUs.
+
+\section{Concurrency in Modern Languages}
+This section will be an overview of the various parallel programming
+concepts modern day languages use. Each section will have an example of
+a typical (toy) parallel program written in one of these languages. Each
+section will talk about what types of parallel programming tasks
+each language/system is and isn't good for.
+
+\subsection{C, C++, and Java}
+Shared state and traditional CPU parallelism problems.
+
+\subsection{CUDA, OpenGL, and OpenMPI}
+Modern day GPU programming
+
+\subsection{Erlang}
+Message passing and no shared state.
+
+\subsection{Rust and Go}
+Not sure, but I know both of these languages promise to make parallel computing
+effortless. I think they both are a combination of C and Erlang style parallelism.
+
+\subsection{Javascript}
+Not parallel but concurrent (with the exception of web workers). Talk about
+the event loop and maybe talk about web workers too.
+
+\subsection{Racket}
+Go over Racket's implementation of threads and the Concurrent ML concepts they employ.
+
+\section{Current State of the Art}
+Depending on time, this section would talk about some of the research underway on
+new parallel programming paradigms, techniques, and technologies. Maybe mention
+Sam Caldwell.
+
+\end{document}
