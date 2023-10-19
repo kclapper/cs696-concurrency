@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 
     char *letters = readFile("input.txt");
     parallel(letters, 0, size - 1);
-    printChars(letters, size - 1);
+    //printChars(letters, size - 1);
 
     return 0;
 }

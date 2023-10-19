@@ -8,11 +8,15 @@ struct Args {
     int high;
 };
 
-int partition(char *array, int low, int high) {
-    if (low >= high) {
-        return low;
-    }
+struct Args* makeArgs(char* array, int low, int high) {
+    struct Args *args = malloc(sizeof(struct Args));
+    args->array = array;
+    args->low = low;
+    args->high = high;
+    return args;
+}
 
+int partition(char *array, int low, int high) {
     char pivot = array[low];
     int lo = low + 1;
     int hi = high;
@@ -42,50 +46,42 @@ int partition(char *array, int low, int high) {
     return hi;
 }
 
-const int MAX_THREADS = 4;
-int THREAD_COUNT = 1;
-
 void *sort(void *argStruct) {
     struct Args *args = (struct Args *)argStruct;
+
     char *array = args->array;
     int low = args->low;
     int high = args->high;
 
+    if (high <= low) {
+        return NULL;
+    }
+
     int pivot = partition(array, low, high);
 
-    // Parallel recursion
-    pthread_t left = NULL;
-    if (pivot - 1 > low) {
-        struct Args leftArgs = { array, low, pivot - 1 };
+    //printf("(left, %i, %i, %i) ", low, pivot, high);
+    struct Args *leftArgs = makeArgs(array, low, pivot - 1);
+    sort(leftArgs);
+    free(leftArgs);
 
-        if (THREAD_COUNT < MAX_THREADS) {
-            printf("Create thread %i\n", ++THREAD_COUNT);
-            pthread_create( &left, NULL, sort, (void *)&leftArgs );
+    //printf("(right, %i, %i, %i)\n", low, pivot, high);
+    struct Args *rightArgs = makeArgs(array, pivot + 1, high);
+    sort(rightArgs);
+    free(rightArgs);
 
-        } else {
-            sort(&leftArgs);
-        }
-    }
-
-    // Serial recursion
-    if (pivot + 1 < high) {
-        struct Args rightArgs = { array, pivot + 1, high };
-        //args->low = pivot + 1;
-        sort(&rightArgs);
-    }
-
-    // Parallel cleanup
-    if (left != NULL) {
-        pthread_join(left, NULL);
-        printf("Delete thread %i\n", THREAD_COUNT--);
-    }
-
-    return 0;
+    return NULL;
 }
 
 void parallel(char* array, int low, int high) {
-    struct Args args = { array, low, high };
-    sort(&args);
+
+    pthread_t left;
+    //pthread_t right = NULL;
+
+    pthread_create( &left, NULL, sort, makeArgs(array, low, high) );
+    //pthread_create( &right, NULL, sort, makeArgs(array, pivot + 1, high) );
+
+    pthread_join(left, NULL);
+    //pthread_join(right, NULL);
 }
 
 void serial(char* array, int low, int high) {

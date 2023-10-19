@@ -1,6 +1,6 @@
 #lang racket
 
-(define size 250000) ;; 1 MB
+(define size 250000) ;; 250 KB
 
 (define (random-char)
   (random 65 90))
