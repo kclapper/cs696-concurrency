@@ -9,6 +9,9 @@ import java.util.Queue;
 import java.util.List;
 import java.util.ArrayList;
 
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 /**
  * A parallel implementation of Boruvka's algorithm to compute a Minimum
  * Spanning Tree.
@@ -28,7 +31,46 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
     @Override
     public void computeBoruvka(final Queue<ParComponent> nodesLoaded,
             final SolutionToBoruvka<ParComponent> solution) {
-        throw new UnsupportedOperationException();
+
+        ParComponent first = null;
+        while ((first = nodesLoaded.poll()) != null) {
+            if (!first.lock.tryLock()) {
+                continue;
+            }
+
+            if (first.isDead) {
+                first.lock.unlock();
+                continue;
+            }
+
+            Edge<ParComponent> edge = first.getMinEdge();
+            if (edge == null) {
+                solution.setSolution(first);
+                break;
+            }
+
+            ParComponent second = edge.getOther(first);
+
+            if (!second.lock.tryLock()) {
+                first.lock.unlock();
+                nodesLoaded.add(first);
+                continue;
+            }
+
+            if (second.isDead) {
+                second.lock.unlock();
+                first.lock.unlock();
+                nodesLoaded.add(first);
+                continue;
+            }
+
+            second.isDead = true;
+            first.merge(second, edge.weight());
+
+            first.lock.unlock();
+            second.lock.unlock();
+            nodesLoaded.add(first);
+        }
     }
 
     /**
@@ -67,6 +109,8 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         public boolean isDead = false;
 
+        public ReentrantLock lock;
+
         /**
          * Constructor.
          *
@@ -75,6 +119,7 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
         public ParComponent(final int setNodeId) {
             super();
             this.nodeId = setNodeId;
+            lock = new ReentrantLock();
         }
 
         /**
@@ -233,6 +278,11 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
         public double weight;
 
         /**
+         * Lock
+         */
+        ReentrantLock lock;
+
+        /**
          * Constructor.
          *
          * @param from From edge.
@@ -244,6 +294,7 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
             fromComponent = from;
             toComponent = to;
             weight = w;
+            lock = new ReentrantLock();
         }
 
         /**
@@ -251,7 +302,7 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         @Override
         public ParComponent fromComponent() {
-            return fromComponent;
+                return fromComponent;
         }
 
         /**
@@ -259,7 +310,7 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         @Override
         public ParComponent toComponent() {
-            return toComponent;
+                return toComponent;
         }
 
         /**
@@ -267,25 +318,23 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         @Override
         public double weight() {
-            return weight;
+                return weight;
         }
 
         /**
          * {@inheritDoc}
          */
         public ParComponent getOther(final ParComponent from) {
-            if (fromComponent == from) {
-                assert (toComponent != from);
-                return toComponent;
-            }
-
-            if (toComponent == from) {
-                assert (fromComponent != from);
-                return fromComponent;
-            }
-            assert (false);
-            return null;
-
+                if (fromComponent == from) {
+                    assert (toComponent != from);
+                    return toComponent;
+                }
+                if (toComponent == from) {
+                    assert (fromComponent != from);
+                    return fromComponent;
+                }
+                assert (false);
+                return null;
         }
 
         /**
@@ -293,13 +342,13 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         @Override
         public int compareTo(final Edge e) {
-            if (e.weight() == weight) {
-                return 0;
-            } else if (weight < e.weight()) {
-                return -1;
-            } else {
-                return 1;
-            }
+                if (e.weight() == weight) {
+                    return 0;
+                } else if (weight < e.weight()) {
+                    return -1;
+                } else {
+                    return 1;
+                }
         }
 
         /**
@@ -307,13 +356,18 @@ public final class ParBoruvka extends AbstractBoruvka<ParBoruvka.ParComponent> {
          */
         public ParEdge replaceComponent(final ParComponent from,
                 final ParComponent to) {
-            if (fromComponent == from) {
-                fromComponent = to;
+            lock.lock();
+            try {
+                if (fromComponent == from) {
+                    fromComponent = to;
+                }
+                if (toComponent == from) {
+                    toComponent = to;
+                }
+                return this;
+            } finally {
+                lock.unlock();
             }
-            if (toComponent == from) {
-                toComponent = to;
-            }
-            return this;
         }
     }
 }
