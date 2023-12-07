@@ -6,38 +6,6 @@
 \begin{document}
 \maketitle
 
-
-\textbf{Major ideas I want to discuss:}
-\begin{enumerate}
-  \item The various levels of concurrency abstraction absolve the programmer
-        from having to worry about the hardware implementation and temporal
-        dependencies (is there a better way to phrase temporal dependencies?).
-
-  \item The various levels of concurrency abstraction are best suited to
-        different types of tasks, here are some examples.
-
-  \item Concurrent abstractions help define (1) how independent pieces of the
-        program communicate and (2) how to think about WHEN these pieces are
-        running.
-
-  \item The difference between concurrency and parallelism.
-
-\end{enumerate}
-
-\textbf{Other topics it would be nice to cover:}
-\begin{enumerate}
-  \item Theory of concurrent programs (CSP, Pi calculus).
-
-  \item Parallel algorithms.
-\end{enumerate}
-
-\textbf{Questions I want to keep thinking about:}
-\begin{enumerate}
-  \item The basis of many concurrent abstractions on the CPU side is the OS
-        (which itself is an abstraction over hardware). How do these
-        abstractions change or how are they mirrored with GPU programming?
-\end{enumerate}
-
 \section{Introduction}
 Concurrency is a notoriously tricky subject. Mentions of concurrent programs are
 often met with trepidation and fear because of their reputation for being
@@ -98,6 +66,14 @@ have been built to make the task easier. These abstractions start at roughly the
 system level, which abstracts over an arbitrary number of hardware cores, and ends with
 programming languages which end up imitating an operating system in order to get a similar
 level of abstraction.
+
+%\subsection{Event Loop}
+%Some languages provide an event loop abstraction. This is similar
+%to the time sharing an operating system gives to processes. The abstraction
+%allows for concurrency but without parallelism. This is how Javascript operates.
+%Golang is specialized for things like this too. Most languages provide some
+%level of support for this kind of abstraction, but in some cases it's built on
+%top of the language, not an integrated language feature.
 
 \subsection{The Operating System}
 Back when computers often only had a single CPU core, it was necessary for the
@@ -176,116 +152,167 @@ keep trying to lock the shared resources but are unable and so release their loc
 constantly oscillating between locked and unlocked and unable to make progress.
 This situation is called live lock.
 
-\subsubsection{Semaphore}
-\subsubsection{Atoms / Atomic Operations}
-\subsubsection{Synchronization}
+\subsubsection{Critical Regions}
+Critical regions are sections of code where access to shared resources may
+introduce race conditions or other concurrency bugs. While the programmer can
+use locks to prevent these bugs, some languages provide features that enable
+them to instead simply specify a critical section and leave it up to the runtime
+to implement the concurrency. An example of this is the synchronized keyword in
+java. This language abstraction provides the programmer a means to specify a
+region of code and provides a guarantee that code will always run under mutual
+exclusion. Meaning, while many threads of computation may want to execute it at
+the same time, only one of them can and the others must wait their turn.
 
-\subsection{Event loop / Time Sharing}
-Some languages provide an event loop abstraction. This is similar
-to the time sharing an operating system gives to processes. The abstraction
-allows for concurrency but without parallelism. This is how Javascript operates.
-Golang is specialized for things like this too. Most languages provide some
-level of support for this kind of abstraction, but in some cases it's built on
-top of the language, not an integrated language feature.
+This kind of critical region abstraction allows programmers to control access to
+shared resources by specifying regions of code that cannot run at the same time.
+While that code may not directly place locks on the shared resources, by
+controlling when it runs, the programmer can achieve the desired effect.
 
-\begin{itemize}
-  \item How does the term asynchronous fit into all of this?
-\end{itemize}
+\subsubsection{Atomicity and Optimistic Concurrency}
+Another class of concurrency abstractions are atomic operations or data
+structures. These abstractions provide guarantees that their operations will
+either happen completely, or not happen at all. They ensure the user will not
+see half completed operations. With these guarentees, the programmer is free to
+use them as a shared resource amoung multiple threads without fear of race
+conditions.
+
+Atomic operations, along with other concurrency abstractions, have driven the
+adoption of certain hardware features in modern CPUs. One such feature is the
+compare-and-swap operation which checks if a value in memory is the same as a
+given value and if it is, swaps it with a new value. The hardware guarantees
+this operation will happen atomically, which means it can be used to prevent
+concurrency bugs and as the basis for other concurrency abstractions.
+
+Indeed, the compare and swap operation is the basis of a technique called
+optimistic concurrency. In this technique, a thread tries to mutate a shared
+resource but monitors whether or not it was successful. If it was not
+successfull, the thread tries again. The compare-and-swap instruction gives the
+programmer the ability to implement this technique easily. They can ready the
+new value for the shared resource, then try to compare and swap. If the swap
+doesn't succeed, they simply keep trying until it does. While this technique
+leaves the thread 'spinning', it avoids the potential overhead of using explicit
+locks and may in some cases be easier to implement or less error prone.
+
+\subsubsection{Use Cases}
+The shared state concurrency model and it's associated abstractions
+have a wide variety of use cases. It's one of the most basic
+concurrency models and is often used to implement higher level
+concurrency abstractions. These shared state abstractions often
+have lower memory or computational overhead compared with message
+passing or actors, so they're often used to implement high
+performance applications such as operating systems or compilers.
+
 
 \subsection{Message Passing}
-Some languages rely on shared state need mechanisms like
-locks and semaphores to manage it.
+In the shared state concurrency model, abstractions are created
+to manage several threads reading and writing memory at the same
+time. Another concurrency model obviates the need for these
+mechanisms by removing the shared memory all together. Instead,
+threads communicate by ``message passing'' or sending each other
+copies of data. Without any shared state, many of the concurrency
+bugs described above cannot occur.
 
-Other languages use no shared state and rely on message passing to
-share data between parallel tasks.
+A programmer needs additional abstractions to build a message
+passing concurrency system. First, the system needs some concept
+of threads. These threads need to have their own state and thread
+of execution. Further, these threads need some system to communicate
+and share data. There may be explicit channels to send data through
+or thread ids to send messages. The data sent between threads needs
+to be copied or otherwise only under the control of a single thread.
+This means that if a thread sends some data to another, a copy of
+that data is either created at the other thread or it is otherwise
+unnaccessible from the first.
 
-These abstractions enforce separation between different threads of
-computation and have strict ways in which they can interact. They
-sometimes have no shared state and communicate entirely via message
+Since processes on a machine cannot share memory (or at least it's
+difficult for them to do so), message passing is the default
+strategy for interprocess communication. An example is the use of
+standard input and output on linux machines. When one process pipes
+it's output to another, it's passing a message to another concurrent
+process. It's not necessary for the first process to finish before
+the second process starts consuming it's output.
+
+Similarly, machines interacting over the internet are using message
+passing. In a traditional client server model, for example a web
+server and a client browswer, both machines are running at the same
+time (concurrently). When the client makes a request to the server,
+it sends it as a message over the internet using the HTTP protocol.
+The client can continue doing work while it waits for a response
+from the server, which itself responds by sending an HTTP message.
+Neither machine shares any physical resources or memory, and so
+their concurrent interaction is achieved entirely through message
 passing.
 
-This is necessarily the mechanism by which physically separate machines/threads
-interact. For example, in a high performance computing cluster or in a
-distributed system.
+\subsubsection{Actors}
+Actors are a further abstraction built on the concept of message
+passing. They can be implemented in any language with basic
+concurrency primitives, but languages such as Swift have them built
+in. Actors combine a thread of computation along with it's
+data/state and communicate with other actors by sending messages.
+Each actor has an ``inbox'' queue where it recieves and processes
+messages from other actors. This queue is
+an abstraction that allows other actors to concurrently send
+at the same time. While it has no guarantee on the order the
+messages are recieved, it guarantees that each message is correctly
+recieved. Messages cannot be shared between actors, so when one
+actors sends data to another, they both have their own copies.
 
-\begin{itemize}
-  \item Example: Instant messaging app. Inter process and inter host.
-\end{itemize}
+This pattern prevents bugs associated with shared state by ensuring
+that nothing is shared between actors. Each actor is only
+responsible for a single thread of computation and since it's the
+only thread accessing it's data, can ensure that data access is
+handled correctly. The actor abstraction allows the programmer to
+focus very little on how the actual concurrency is handled. The
+actor system provides the implementation of the ``inbox'', message
+passing, and actor thread scheduling.
 
-\subsubsection{Channels}
-\subsubsection{Messages}
-
-\begin{itemize}
-  \item Maybe talk about how GPU programming is basically a combination of
-        Shared state programming and message passing? Like, it's shared state on
-        the GPU side but communication between the GPU and CPU is (necessarily?)
-        message passing.
-  \item Maybe talk about distributed programming here?
-  \item Maybe talk about client/server paradigms here?
-\end{itemize}
-
-\subsection{Actors}
-
-\subsection{Recreating the Operating System}
-
-Some lanugages give abstractions to the programmer that have strict
-separation and communication requirements but that mirrors an operating
-system in the level of control and the structure it imposes. See Racket.
-
-\begin{itemize}
-  \item Racket, Revenge of the Son of the Lisp Machine. Custodians, threads,
-        etc.
-  \item Has threads which are threads of control with their own I/O, control
-        flow, and resources.
-  \item How do threads communicate?
-  \item Uses custodians for resource control. Threads, I/O ports, eventspaces.
-  \item Custodians are hierarchical.
-\end{itemize}
-
-\section{Example Use Cases for Concurrency}
-
-This section will be a showcase of various concurrency abstractions
-and how they are typically used. Maybe this would be a good place to
-talk about parallel algorithms?
-
-\subsection{Shared State}
-
-\subsection{Event Loop}
-
-\subsection{Message Passing}
+\subsubsection{Use Cases}
+Message passing and actors are high level concurrency abstractions
+that allow programmers to much more easily access concurrency
+in their programs, often with performance benefits. These types
+of abstractions are well suited for systems that need to scale
+a high degree of scalability or fault tolerance. The isolated
+nature of actors or threads with message passing makes it easier
+to handle failures gracefully. A good example of this is the Erlang
+programming language. This language was built with actors and
+concurrency at it's heart and was used by the company Ericson to
+built highly concurrent and fault tolerant telephony systems.
 
 \subsection{Recreating the Operating System}
+As higher and higher level abstractions are built to handle
+concurrency in programs, the programming language starts
+to resemble an operating system itself. For example, the Racket
+language has various high level abstractions to handle concurrency.
+One of the aims of these abstractions is to safely allow threads to
+access and share resources while retaining the ability to kill child
+threads as needed. These design goals have led the Racket language
+to adopt abstractions that are rather similar to the abstractions
+that an operating system provides the programs running on it.
 
-\section{*DEPRECATED?* Concurrency in Modern Languages}
-This section will be an overview of the various parallel programming
-concepts modern day languages use. Each section will have an example of
-a typical (toy) parallel program written in one of these languages. Each
-section will talk about what types of parallel programming tasks
-each language/system is and isn't good for.
+In the Racket language, each thread of computation has it's
+own set of resources including I/O, memory, and control flow. These
+resources are governed by custodians, which are responsible for
+reclaiming these resources after they're done been used or the
+thread is terminated. These custodians can be hierarchical. If one
+thread spawns new threads, each will have their own sub-custodian
+under the orign thread's custodian. If a custodian reclaims it's
+resources, it forces all of it's sub-custodians to reclaim their
+resources as well.
 
-\subsection{C, C++, and Java}
-Shared state and traditional CPU parallelism problems.
+In this way the Racket language concurrency system starts to look
+similar to an operating system. A main thread (the OS) can spawn
+several other threads (processes). These threads themselves can
+spawn threads (posix threads), and if a thread is killed, the
+threads it spawned are killed as well (a terminated process also
+terminates any threads it created). The similarity is also shown
+in the way threads are allocated their own set of resources which
+are reclaimed when a thread is killed.
 
-\subsection{CUDA, OpenGL, and OpenMPI}
-Modern day GPU programming
-
-\subsection{Erlang}
-Message passing and no shared state.
-
-\subsection{Rust and Go}
-Not sure, but I know both of these languages promise to make parallel computing
-effortless. I think they both are a combination of C and Erlang style parallelism.
-
-\subsection{Javascript}
-Not parallel but concurrent (with the exception of web workers). Talk about
-the event loop and maybe talk about web workers too.
-
-\subsection{Racket}
-Go over Racket's implementation of threads and the Concurrent ML concepts they employ.
-
-\section{Current State of the Art}
-Depending on time, this section would talk about some of the research underway on
-new parallel programming paradigms, techniques, and technologies. Maybe mention
-Sam Caldwell.
+\subsubsection{Use Cases}
+These concurrency abstractions in the Racket language where inspired
+by their applicability towards building Dr. Racket, a Racket IDE
+with a built in REPL. Dr. Racket is built with Racket, and the
+language's use of custodians and threads allows it to evaluate
+Racket programs and have a REPL while retaining a reponsive UI and
+the ability to kill either when necessary.
 
 \end{document}
