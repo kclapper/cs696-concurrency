@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <quicksort.h>
 
@@ -51,14 +52,17 @@ char* readFile(char *path) {
 }
 
 int main(int argc, char *argv[]) {
-    //char *letters = readStdin(argc - 1, &argv[1]);
-    //parallel(letters, 0, argc - 2);
-    //printChars(letters, argc - 1);
-
     char *letters = readFile("input.txt");
     
+    clock_t start, end;
+
+    start = clock();
     parallel(letters, 0, size - 1);
-    printChars(letters, size - 1);
+    end = clock();
+
+    printf("Sort took %f seconds using %i thread(s)\n", ((double) end - start) / CLOCKS_PER_SEC, MAX_THREADS);
+
+    //printChars(letters, size - 1);
 
     return 0;
 }

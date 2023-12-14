@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+
 struct Args {
     char *array;
     int low;
@@ -35,9 +36,8 @@ int partition(char *array, int low, int high) {
     return hi;
 }
 
-typedef pthread_mutex_t mutex_t;
-
-mutex_t lock;
+pthread_mutex_t lock;
+int num_threads = 1;
 
 void *sort(void *argStruct) {
     struct Args *args = (struct Args *)argStruct;
@@ -56,14 +56,48 @@ void *sort(void *argStruct) {
     leftArgs.array = array;
     leftArgs.low = low;
     leftArgs.high = pivot - 1;
-    sort(&leftArgs);
 
     struct Args rightArgs; 
     rightArgs.array = array;
     rightArgs.low = pivot + 1;
     rightArgs.high = high;
-    sort(&rightArgs);
 
+    pthread_t left;
+    pthread_t right;
+
+    pthread_mutex_lock(&lock);
+    if (num_threads < MAX_THREADS) {
+	num_threads++;
+	pthread_mutex_unlock(&lock);
+    	pthread_create( &left, NULL, sort, &leftArgs );
+    } else {
+	pthread_mutex_unlock(&lock);
+    	sort(&leftArgs);
+    }
+    
+    pthread_mutex_lock(&lock);
+    if (num_threads < MAX_THREADS) {
+	num_threads++;
+	pthread_mutex_unlock(&lock);
+    	pthread_create( &right, NULL, sort, &rightArgs );
+    } else {
+	pthread_mutex_unlock(&lock);
+    	sort(&rightArgs);
+    }
+
+
+    if (left != NULL) {
+        pthread_join(left, NULL);
+	//pthread_mutex_lock(&lock);
+	//num_threads--;
+	//pthread_mutex_unlock(&lock);
+    }
+    if (right != NULL) {
+        pthread_join(right, NULL);
+	//pthread_mutex_lock(&lock);
+	//num_threads--;
+	//pthread_mutex_unlock(&lock);
+    }
     return NULL;
 }
 
@@ -73,22 +107,28 @@ void parallel(char* array, int low, int high) {
 	return;
     }
 
-    int pivot = partition(array, low, high);
+    struct Args args;
+    args.array = array;
+    args.low = low;
+    args.high = high;
+    sort(&args);
 
-    pthread_t left;
-    struct Args leftArgs;
-    leftArgs.array = array;
-    leftArgs.low = low;
-    leftArgs.high = pivot - 1;
-    pthread_create( &left, NULL, sort, &leftArgs );
-    
-    pthread_t right;
-    struct Args rightArgs;
-    rightArgs.array = array;
-    rightArgs.low = pivot + 1;
-    rightArgs.high = high;
-    pthread_create( &right, NULL, sort, &rightArgs );
+    //int pivot = partition(array, low, high);
 
-    pthread_join(left, NULL);
-    pthread_join(right, NULL);
+    //pthread_t left;
+    //struct Args leftArgs;
+    //leftArgs.array = array;
+    //leftArgs.low = low;
+    //leftArgs.high = pivot - 1;
+    //pthread_create( &left, NULL, sort, &leftArgs );
+    //
+    //pthread_t right;
+    //struct Args rightArgs;
+    //rightArgs.array = array;
+    //rightArgs.low = pivot + 1;
+    //rightArgs.high = high;
+    //pthread_create( &right, NULL, sort, &rightArgs );
+
+    //pthread_join(left, NULL);
+    //pthread_join(right, NULL);
 }
