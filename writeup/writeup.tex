@@ -1,31 +1,49 @@
 \documentclass{article}
 
+\usepackage[
+backend=biber,
+style=numeric,
+]{biblatex}
+\addbibresource{writeup.bib}
+
+\usepackage{csquotes}
+
+\usepackage{hyperref}
+
 \title{CS696 Concurrency}
 \author{Kyle Clapper}
 
 \begin{document}
 \maketitle
 
+\begin{displayquote}
+  This semester, Fall 2023, I did an independent study on concurrent programming
+  with Stephen Chang. This writeup details the things I've learned through this
+  experience. A GitHub repository associated with this independent study
+  contains sample programs and projects I've worked on this semester as well.
+  You can find it here:
+  \href{https://github.com/kclapper/cs696-concurrency}{https://github.com/kclapper/cs696-concurrency}
+\end{displayquote}
+
 \section{Introduction}
-Concurrency is a notoriously tricky subject. Mentions of concurrent programs are
-often met with trepidation and fear because of their reputation for being
-difficult to program. These fears are not unwarrented because concurrent
-programs upset the mental model many programmers have for their programs. That
-being of sequential operations that happen (more or less) in the order their
-program specifies. These are typical sequential programs. Adding concurrency
-decouples the lexical order of the program from the order in which parts of the
-program are executed. This requires a very different mental model and a host of
-new systems and abstractions to manage it.
+Concurrent programming upsets the mental model many programmers have for their
+programs. In school, Computer Science students typically spend most of their
+time working with sequential programs and their mental model of programming
+likely follows this paradigm. This can make it hard to program in an environment
+where multiple threads of computation appear to be happening at the same time.
+To make concurrent programming easier requires new systems and abstractions.
 
 For many years programs were written almost exclusively in a sequential fasion.
 Programmers at the time could rely on Moores law to increase the speed of their
-programs without doing any additional work. Then, sometime around 2005, programmers
-began to realize the limits of Moores law. At some point, the ``free lunch'' will
-be over and they won't be able to rely on their programs getting faster as faster processors
-come out. As we've seen in recent years, the increase in CPU clock speed has started to slow
-and the focus is more and more on CPUs with multiple cores. With this shift in computer
-hardware, it's becoming increasingly necessary for programmers to write concurrent programs
-to take advantage of all system resources.
+programs without doing any additional work. Then, sometime around 2005,
+programmers began to realize the limits of Moores law. At some point, the ``free
+lunch'' will be over and they won't be able to rely on their programs getting
+faster as faster processors come out \cite{FreeLunch, PCTheoryAndPractice,
+  PPInC, MIT6031}. As we've seen in recent years, the increase in CPU clock speed has
+started to slow, and in response, CPUs are being built with more cores to
+increase performance. With this shift in computer hardware, it's becoming
+increasingly necessary for programmers to write concurrent programs to take
+advantage of all system resources.
 
 \subsection{Concurrency vs Parallelism}
 A common point of confusion is the difference between concurrency and parallelism.
@@ -34,31 +52,28 @@ In a similar way that a square is a rectangle but a rectangle is not necessarily
 square, paralellism is a form of concurrency but concurrency does not necessarily
 imply parallelism.
 
-Concurrency is when you have multiple independent threads of computation happening
-in a program. Parallelism is when two or more of those threads are being processed
-at the same time. Concurrency without parallelism often takes the form of time sharing.
-For example, two concurrent processes executing on a single CPU machine will appear
-to run at the same time, but they are not parallel because they aren't actually running
-at the same time but instead sharing time slices allocated by the operating system.
+Concurrency is when you have multiple independent threads of computation
+happening in a program. Parallelism is when two or more of those threads are
+being processed at the same time \cite{PCTheoryAndPractice}. Concurrency without
+parallelism sometimes takes the form of time sharing. For example, two
+concurrent processes executing on a single CPU machine will appear to run at the
+same time, but they are not parallel because they aren't actually running at the
+same time but instead sharing time slices allocated by the operating system.
 
-For example, if two operating system processes are running at the same time on
-separate CPU cores, then they are running in parallel. If instead, you have a
-program with two functions, one that requires waiting for an I/O device and another
-that does not, and the non-I/O function runs while the other function is waiting,
-then this is concurrency but not parallelism. In this example, both functions are
+Two operating system processes running at the same time on separate CPU cores
+are said to be running in parallel. If instead, you have a program with two
+functions, one that requires waiting for an I/O device and another that does
+not, and the non-I/O function runs while the other function is waiting, then
+this is concurrency but not parallelism. In this example, both functions are
 running on the same thread of computation, but the time is shared between them.
 
-It's worth mentioning that distributed systems are concurrent as well. If you have
-a web application that's built as a collection of independent services communicating
-over HTTP, these services act in a concurrent fashion, and their interactions proceed
-concurrently. These services are likely running in parallel, but there's nothing stopping
-these services from both running on a single core server, in which case they would not
-be in parallel and would instead be taking turns on the one processor.
-
-%\subsection{Task Parallelism vs Data Parallelism}
-%This is basically the difference between GPU parallelism
-%and CPU parallelism. SIMD vs running different tasks on
-%different CPUs.
+It's worth mentioning that distributed systems are concurrent as well. If you
+have a web application that's built as a collection of independent services
+communicating over HTTP, these services act in a concurrent fashion, and their
+interactions proceed concurrently \cite{TuftsCS21, MIT6031}. These services are
+likely running in parallel, but there's nothing stopping these services from
+both running on a single core server, in which case they would not be in
+parallel and would instead be taking turns on the one processor.
 
 \section{Concurrent Abstractions}
 Concurrency is tricky, and as programmers are want to do, many levels of abstraction
@@ -67,19 +82,11 @@ system level, which abstracts over an arbitrary number of hardware cores, and en
 programming languages which end up imitating an operating system in order to get a similar
 level of abstraction.
 
-%\subsection{Event Loop}
-%Some languages provide an event loop abstraction. This is similar
-%to the time sharing an operating system gives to processes. The abstraction
-%allows for concurrency but without parallelism. This is how Javascript operates.
-%Golang is specialized for things like this too. Most languages provide some
-%level of support for this kind of abstraction, but in some cases it's built on
-%top of the language, not an integrated language feature.
-
 \subsection{The Operating System}
 Back when computers often only had a single CPU core, it was necessary for the
 operating system to provide abstractions to allow multiple programs to run at
 once. In order to multitask, the operating system needed to give programs a
-'process' abstraction, in which the program could view itself as the only
+``process'' abstraction, in which the program could view itself as the only
 running program on the machine, or rather the exclusive user of a hardware
 thread. With only one hardware thread and many programs, the OS switched between
 them quickly in order to simulate multiple threads. To users, especially of
@@ -91,24 +98,25 @@ machines. Instead of time sharing over one hardware thread, the operating system
 could now spread the workload out over multiple. This means programs physically
 running at the same time, as opposed to switching back and forth. The operating
 system still provides process abstractions. In addition, operating systems
-typically also provide a 'threads' abstraction. Programs can split themselves up
+typically also provide a ``threads'' abstraction. Programs can split themselves up
 into multiple threads of execution, each thread having less overhead than a
-'process'. These threads often share a memory space and can communicate between
+``process''. These threads often share a memory space and can communicate between
 each other using this shared memory.
 
 \subsection{Shared State}
-The concurrency model of lanugages like C, C++, and Java is primarily threads with
-shared state or shared memory. In this model, different threads of execution communicate
-amoungst each other using shared memory. With this model comes additional abstractions
-to handle safely interacting with shared memory.
+The concurrency model of lanugages like C, C++, and Java is primarily threads
+with shared state or shared memory. In this model, different threads of
+execution communicate amoungst each other using shared memory. This model
+necessitates abstractions to handle safely interacting with shared memory. \cite{Coursera}
 
 Threads are the primary abstraction in the shared state model. These threads
 largely line up with the concept of operating system threads. Indeed, in C and
-C++ these are exactly the threads that are used. In languages like Java however,
-they have their own concept of threads which are lighter weight that OS threads.
-Java, running on a virtual machine, is able to create and manage this
-abstraction on it's own. In that case, the Java threads are scheduled on the JVM
-and the JVM translates this to interactions with operating system / hardware.
+C++ these are exactly the threads that are used \cite{PPInC, LLNLPOSIX}. In
+languages like Java however, they have their own concept of threads which are
+lighter weight that OS threads. Java, running on a virtual machine, is able to
+create and manage this abstraction on it's own. In that case, the Java threads
+are scheduled on the JVM and the JVM translates this to interactions with
+operating system / hardware.
 
 When you have multiple threads of execution accessing the same memory at the
 same time, you run into new classes of issues not present in sequential
@@ -118,7 +126,7 @@ different effects on that resource resulting in conflicting updates to the
 shared state. For example, if two threads access a counter variable at the same
 time, they both might read the same value from memory, but if they go to update
 the value with different numbers, only one of them will actually be stored and
-the other will be overwritten.
+the other will be overwritten. \cite{Coursera, TuftsCS21, PCTheoryAndPractice}
 
 \subsubsection{Locks}
 Locks are an abstraction that is primarily used to resolve race conditions and
@@ -132,6 +140,7 @@ read-only locks on a resource or a single write lock. This is useful because the
 value of a shared resource can be read by multiple threads simultaneously without
 issue so long as the value is not changed. If the value is going to be changed, it
 must happen under mutual exclusion to ensure there is no confusion over it's value.
+\cite{Coursera}
 
 Locks help solve race conditions in shared memory concurrency environments, but
 they can introduce their own problems. Consider the scenario where multiple
@@ -142,6 +151,7 @@ make progress. If the thread with the lock fails to halt or needs to access a
 lock held by one of the blocked threads, then the whole program will hang. This
 situation is called a deadlock. The resources needed to make progress are held
 under locks that will not be released.
+\cite{Coursera}
 
 Similarly, consider the scenario where two threads need access to two shared
 resources in order to make progress. Consider that each thread may try to place
@@ -151,6 +161,7 @@ try again from the beginning. In this scenario, it's possible that both threads
 keep trying to lock the shared resources but are unable and so release their locks,
 constantly oscillating between locked and unlocked and unable to make progress.
 This situation is called live lock.
+\cite{Coursera}
 
 \subsubsection{Critical Regions}
 Critical regions are sections of code where access to shared resources may
@@ -162,11 +173,13 @@ java. This language abstraction provides the programmer a means to specify a
 region of code and provides a guarantee that code will always run under mutual
 exclusion. Meaning, while many threads of computation may want to execute it at
 the same time, only one of them can and the others must wait their turn.
+\cite{Coursera}
 
 This kind of critical region abstraction allows programmers to control access to
 shared resources by specifying regions of code that cannot run at the same time.
 While that code may not directly place locks on the shared resources, by
 controlling when it runs, the programmer can achieve the desired effect.
+\cite{Coursera}
 
 \subsubsection{Atomicity and Optimistic Concurrency}
 Another class of concurrency abstractions are atomic operations or data
@@ -175,6 +188,7 @@ either happen completely, or not happen at all. They ensure the user will not
 see half completed operations. With these guarentees, the programmer is free to
 use them as a shared resource amoung multiple threads without fear of race
 conditions.
+\cite{Coursera}
 
 Atomic operations, along with other concurrency abstractions, have driven the
 adoption of certain hardware features in modern CPUs. One such feature is the
@@ -182,6 +196,7 @@ compare-and-swap operation which checks if a value in memory is the same as a
 given value and if it is, swaps it with a new value. The hardware guarantees
 this operation will happen atomically, which means it can be used to prevent
 concurrency bugs and as the basis for other concurrency abstractions.
+\cite{Coursera}
 
 Indeed, the compare and swap operation is the basis of a technique called
 optimistic concurrency. In this technique, a thread tries to mutate a shared
@@ -190,17 +205,18 @@ successfull, the thread tries again. The compare-and-swap instruction gives the
 programmer the ability to implement this technique easily. They can ready the
 new value for the shared resource, then try to compare and swap. If the swap
 doesn't succeed, they simply keep trying until it does. While this technique
-leaves the thread 'spinning', it avoids the potential overhead of using explicit
+leaves the thread ``spinning'', it avoids the potential overhead of using explicit
 locks and may in some cases be easier to implement or less error prone.
+\cite{Coursera}
 
 \subsubsection{Use Cases}
-The shared state concurrency model and it's associated abstractions
-have a wide variety of use cases. It's one of the most basic
-concurrency models and is often used to implement higher level
-concurrency abstractions. These shared state abstractions often
-have lower memory or computational overhead compared with message
-passing or actors, so they're often used to implement high
-performance applications such as operating systems or compilers.
+The shared state concurrency model and it's associated abstractions have a wide
+variety of use cases. It's one of the most basic concurrency models and is often
+used to implement higher level concurrency abstractions \cite{TuftsCS21,
+  Coursera}. These shared state abstractions often have lower memory or
+computational overhead compared with message passing or actors, so they're often
+used to implement high performance applications such as operating systems or
+compilers.
 
 
 \subsection{Message Passing}
@@ -211,6 +227,7 @@ mechanisms by removing the shared memory all together. Instead,
 threads communicate by ``message passing'' or sending each other
 copies of data. Without any shared state, many of the concurrency
 bugs described above cannot occur.
+\cite{Coursera, TuftsCS21}
 
 A programmer needs additional abstractions to build a message
 passing concurrency system. First, the system needs some concept
@@ -222,14 +239,14 @@ to be copied or otherwise only under the control of a single thread.
 This means that if a thread sends some data to another, a copy of
 that data is either created at the other thread or it is otherwise
 unnaccessible from the first.
+\cite{Coursera, TuftsCS21}
 
-Since processes on a machine cannot share memory (or at least it's
-difficult for them to do so), message passing is the default
-strategy for interprocess communication. An example is the use of
-standard input and output on linux machines. When one process pipes
-it's output to another, it's passing a message to another concurrent
-process. It's not necessary for the first process to finish before
-the second process starts consuming it's output.
+Since processes on a machine cannot share memory (or at least it's difficult for
+them to do so), message passing is the default strategy for interprocess
+communication. An example is the use of standard input and output on linux
+machines. When one process pipes it's output to another, it's passing a message
+to another concurrent process \cite{MIT6031}. It's not necessary for the first
+process to finish before the second process starts consuming it's output.
 
 Similarly, machines interacting over the internet are using message
 passing. In a traditional client server model, for example a web
@@ -241,12 +258,13 @@ from the server, which itself responds by sending an HTTP message.
 Neither machine shares any physical resources or memory, and so
 their concurrent interaction is achieved entirely through message
 passing.
+\cite{MIT6031, TuftsCS21}
 
 \subsubsection{Actors}
 Actors are a further abstraction built on the concept of message
 passing. They can be implemented in any language with basic
 concurrency primitives, but languages such as Swift have them built
-in. Actors combine a thread of computation along with it's
+in \cite{Swift}. Actors combine a thread of computation along with it's
 data/state and communicate with other actors by sending messages.
 Each actor has an ``inbox'' queue where it recieves and processes
 messages from other actors. This queue is
@@ -255,13 +273,14 @@ at the same time. While it has no guarantee on the order the
 messages are recieved, it guarantees that each message is correctly
 recieved. Messages cannot be shared between actors, so when one
 actors sends data to another, they both have their own copies.
+\cite{Coursera}
 
 This pattern prevents bugs associated with shared state by ensuring
 that nothing is shared between actors. Each actor is only
 responsible for a single thread of computation and since it's the
 only thread accessing it's data, can ensure that data access is
 handled correctly. The actor abstraction allows the programmer to
-focus very little on how the actual concurrency is handled. The
+avoid thinkign about how the actual concurrency is handled. The
 actor system provides the implementation of the ``inbox'', message
 passing, and actor thread scheduling.
 
@@ -276,6 +295,7 @@ to handle failures gracefully. A good example of this is the Erlang
 programming language. This language was built with actors and
 concurrency at it's heart and was used by the company Ericson to
 built highly concurrent and fault tolerant telephony systems.
+\cite{TuftsCS21, Coursera}
 
 \subsection{Recreating the Operating System}
 As higher and higher level abstractions are built to handle
@@ -287,6 +307,7 @@ access and share resources while retaining the ability to kill child
 threads as needed. These design goals have led the Racket language
 to adopt abstractions that are rather similar to the abstractions
 that an operating system provides the programs running on it.
+\cite{LispMachine, KillSafe}
 
 In the Racket language, each thread of computation has it's
 own set of resources including I/O, memory, and control flow. These
@@ -297,6 +318,7 @@ thread spawns new threads, each will have their own sub-custodian
 under the orign thread's custodian. If a custodian reclaims it's
 resources, it forces all of it's sub-custodians to reclaim their
 resources as well.
+\cite{KillSafe}
 
 In this way the Racket language concurrency system starts to look
 similar to an operating system. A main thread (the OS) can spawn
@@ -314,5 +336,9 @@ with a built in REPL. Dr. Racket is built with Racket, and the
 language's use of custodians and threads allows it to evaluate
 Racket programs and have a REPL while retaining a reponsive UI and
 the ability to kill either when necessary.
+\cite{LispMachine, KillSafe}
+
+\nocite{*}
+\printbibliography
 
 \end{document}
